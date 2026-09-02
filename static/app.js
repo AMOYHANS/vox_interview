@@ -472,6 +472,13 @@ function lockSetup() {
   $('btnStart').hidden = true;
 }
 
+// 面试结束后解锁, 允许修改配置并发起新一轮
+function unlockSetup() {
+  $('setupPanel').classList.remove('locked');
+  $('lockHint').textContent = '';
+  $('btnStart').hidden = false;
+}
+
 function enableInputs(on) {
   $('btnMic').disabled = !on;
   $('txtInput').disabled = !on;
@@ -1080,6 +1087,10 @@ async function endInterview() {
 
   await saveRecord();
   clearSnapshot();
+  // 解锁配置区, 允许修改并发起新一轮面试
+  unlockSetup();
+  statusPill('', '待开始');
+  addSystemLine('✅ 本次面试已结束。可在左侧修改配置，点击「开始面试」开启新的一轮。');
   if (state.summary) openSummary();
   else addSystemLine('⚠️ 未能生成总结。可在「历史记录」中查看本次记录。');
 }
