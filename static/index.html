@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>语音面试助手</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="logo">🎙️</span> 语音面试助手</div>
+    <div class="tabs">
+      <button class="tab active" id="tabInterview">面试</button>
+      <button class="tab" id="tabRecords">历史记录</button>
+    </div>
+    <div class="topbar-right">
+      <span id="statusPill" class="pill">待开始</span>
+      <button id="btnEnd" class="btn danger" disabled>结束面试并总结</button>
+    </div>
+  </header>
+
+  <div id="resumeBar" class="resume-bar" hidden>
+    <span>检测到一次未结束的面试，是否恢复？</span>
+    <button id="btnResume" class="btn small">恢复</button>
+    <button id="btnDiscard" class="btn ghost small">放弃</button>
+  </div>
+
+  <main id="view-interview" class="view">
+    <aside class="panel setup" id="setupPanel">
+      <div class="panel-head">
+        <h2>面试配置</h2>
+        <span id="lockHint" class="muted"></span>
+      </div>
+
+      <fieldset id="fsProfile">
+        <legend>👤 面试官信息</legend>
+        <div class="grid2">
+          <label>姓名<input id="inName" value="林悦" placeholder="面试官姓名" /></label>
+          <label>头衔<input id="inTitle" value="资深招聘经理" placeholder="如：技术负责人 / HR" /></label>
+        </div>
+        <label>画像 / 性格描述
+          <textarea id="inPersona" rows="2">10 年招聘经验，擅长技术型岗位面试，注重候选人的项目深度、逻辑表达与学习能力。</textarea>
+        </label>
+        <div class="grid2">
+          <label>沟通风格
+            <select id="inStyle">
+              <option value="专业严谨、直接高效">专业严谨</option>
+              <option value="温和亲切、循循善诱" selected>温和亲切</option>
+              <option value="幽默轻松、气氛活跃">幽默轻松</option>
+              <option value="高压施压、提出尖锐问题">压力面试</option>
+            </select>
+          </label>
+          <label>面试官音色
+            <select id="inVoice"></select>
+          </label>
+        </div>
+        <div class="grid2">
+          <label>语速 <span class="val" id="valRate">0%</span><input type="range" id="inRate" min="-50" max="50" value="0" /></label>
+          <label>音调 <span class="val" id="valPitch">0Hz</span><input type="range" id="inPitch" min="-20" max="20" value="0" /></label>
+        </div>
+        <div class="row">
+          <label class="grow">自定义音色 ID（选填）<input id="inVoiceCustom" placeholder="留空使用上方选择，如 zh-CN-YunyangNeural" /></label>
+          <button id="btnPreview" class="btn ghost" type="button">试听音色</button>
+        </div>
+      </fieldset>
+
+      <fieldset id="fsJob">
+        <legend>💼 职位信息</legend>
+        <div class="grid2">
+          <label>公司<input id="inCompany" value="示例科技有限公司" /></label>
+          <label>职位名称<input id="inJobTitle" value="前端开发工程师" /></label>
+        </div>
+        <label>职位描述 / 任职要求
+          <textarea id="inJd" rows="3">负责公司核心产品 Web 前端开发；熟练使用 Vue / React；3 年以上前端开发经验；具备良好的代码质量意识与团队协作能力。</textarea>
+        </label>
+        <label>考察重点
+          <textarea id="inFocus" rows="2">项目经验真实性；技术深度与方案设计；沟通表达与逻辑；团队协作与主动性。</textarea>
+        </label>
+      </fieldset>
+
+      <fieldset id="fsLLM">
+        <legend>🧠 面试官大脑（大模型）</legend>
+        <p class="hint">兼容任意 OpenAI 格式接口。<b>未配置 Token 时使用内置提问脚本</b>，也能走通流程。填好 API Key 即自动接入 AI。</p>
+        <label>常用服务
+          <select id="selLlmProvider">
+            <option value="minimax">MiniMax</option>
+            <option value="deepseek" selected>DeepSeek</option>
+            <option value="openai">OpenAI</option>
+            <option value="moonshot">Moonshot（Kimi）</option>
+            <option value="qwen">通义千问</option>
+            <option value="siliconflow">SiliconFlow</option>
+            <option value="">自定义</option>
+          </select>
+        </label>
+        <div class="grid2">
+          <label>接口地址<input id="inLlmUrl" value="https://api.deepseek.com/v1" placeholder="https://api.deepseek.com/v1" /></label>
+          <label>Token（API Key）<input id="inLlmKey" type="password" placeholder="sk-..." /></label>
+        </div>
+        <label>模型名称<input id="inLlmModel" value="deepseek-chat" placeholder="如 deepseek-chat / gpt-4o-mini" /></label>
+        <div class="row">
+          <button id="btnTestLlm" class="btn" type="button">🔌 测试连通性</button>
+          <span class="grow"></span>
+        </div>
+        <div id="llmStatus" class="hint">当前：内置提问脚本（未配置 Token）</div>
+      </fieldset>
+
+      <fieldset id="fsTts">
+        <legend>🔊 语音合成（TTS）</legend>
+        <label>合成方式
+          <select id="selTts">
+            <option value="edge">Edge TTS（免费，推荐）</option>
+            <option value="voxcpm">本地克隆音色 VoxCPM（需安装）</option>
+            <option value="third">第三方接口（需 Token）</option>
+          </select>
+        </label>
+        <div id="ttsThird" class="third-box" hidden>
+          <div class="grid2">
+            <label>接口地址<input id="inTtsUrl" placeholder="https://api.openai.com/v1" /></label>
+            <label>Token<input id="inTtsKey" type="password" placeholder="sk-..." /></label>
+          </div>
+          <div class="grid2">
+            <label>模型<input id="inTtsModel" value="tts-1" /></label>
+            <label>音色 ID<input id="inTtsVoice" value="alloy" /></label>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset id="fsStt">
+        <legend>🎤 语音识别（STT）</legend>
+        <label>识别方式
+          <select id="selStt">
+            <option value="browser">浏览器语音识别（免费，推荐，需 Chrome / Edge）</option>
+            <option value="third">第三方接口（需 Token）</option>
+          </select>
+        </label>
+        <div id="sttThird" class="third-box" hidden>
+          <div class="grid2">
+            <label>接口地址<input id="inSttUrl" value="https://api.openai.com/v1" placeholder="https://api.openai.com/v1" /></label>
+            <label>Token<input id="inSttKey" type="password" placeholder="sk-..." /></label>
+          </div>
+          <label>模型<input id="inSttModel" value="whisper-1" /></label>
+        </div>
+      </fieldset>
+
+      <fieldset id="fsMode">
+        <legend>🎙️ 交互方式</legend>
+        <div class="grid2">
+          <label>对话方式
+            <select id="selMode">
+              <option value="realtime">实时语音（自动判停，无需按键）</option>
+              <option value="manual">手动模式（按键说话 / 打字）</option>
+            </select>
+          </label>
+          <div>
+            <label class="inline"><input type="checkbox" id="inBargeIn" checked /> 说话时自动打断面试官播报</label>
+            <label class="inline"><input type="checkbox" id="inInterim" /> 实时字幕预览（增加CPU占用）</label>
+          </div>
+        </div>
+        <div class="row">
+          <label class="grow">判停灵敏度（越大越不易抢话）
+            <input type="range" id="inSens" min="1" max="10" value="5" />
+          </label>
+          <span class="val" id="valSens">中等(5)</span>
+        </div>
+        <p class="hint">觉得面试官抢话/打断频繁 → 往右调到「保守」；反应太慢 → 往左调。</p>
+        <div id="speechBanner" class="hint speech-banner" hidden></div>
+      </fieldset>
+
+      <button id="btnStart" class="btn primary big">开始面试 ▶</button>
+    </aside>
+
+    <section class="panel chat-panel">
+      <div class="chat-meta" id="chatMeta">请在左侧完成配置后点击「开始面试」</div>
+      <div class="chat-log" id="chatLog"></div>
+      <div class="live-bar" id="liveBar" hidden>
+        <span class="pulse-dot"></span>
+        <span id="liveText">正在聆听…</span>
+        <span class="level-track"><span class="level-fill" id="levelFill"></span></span>
+      </div>
+      <div class="input-row">
+        <button id="btnMic" class="btn mic" disabled title="说一段话并结束发言">🎤 说话</button>
+        <textarea id="txtInput" rows="2" placeholder="也可以直接输入文字回复…" disabled></textarea>
+        <button id="btnSend" class="btn primary" disabled>发送</button>
+      </div>
+    </section>
+  </main>
+
+  <main id="view-records" class="view" hidden>
+    <section class="panel">
+      <div class="panel-head">
+        <h2>📂 历史面试记录</h2>
+        <button id="btnRefreshRecords" class="btn ghost small">刷新</button>
+      </div>
+      <div id="recordList" class="record-list"></div>
+    </section>
+  </main>
+
+  <div id="summaryModal" class="modal-backdrop" hidden>
+    <div class="modal">
+      <div class="modal-head">
+        <h2>📋 面试总结与建议</h2>
+        <button class="btn icon" id="btnCloseSummary">✕</button>
+      </div>
+      <div id="summaryBody" class="modal-body"></div>
+      <div class="modal-actions">
+        <button id="btnExport" class="btn">导出 JSON</button>
+        <button id="btnCloseSummary2" class="btn primary">知道了</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="detailModal" class="modal-backdrop" hidden>
+    <div class="modal wide">
+      <div class="modal-head">
+        <h2>📄 记录详情</h2>
+        <button class="btn icon" id="btnCloseDetail">✕</button>
+      </div>
+      <div id="detailBody" class="modal-body"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

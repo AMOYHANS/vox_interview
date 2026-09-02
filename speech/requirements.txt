@@ -1,0 +1,17 @@
+# 实时语音服务依赖（VAD + SmartTurn + SenseVoice STT）
+# 需要 Python 3.10 ~ 3.14。torch 在 Windows 默认装 CPU 版。
+websockets>=12
+numpy
+scipy
+onnxruntime
+silero-vad
+transformers
+huggingface-hub
+torch
+funasr>=1.4.2
+modelscope
+
+# ── 可选：本地克隆音色 TTS（VoxCPM，CPU 很慢，按需启用）──
+# 安装方式：pip install voxcpm
+# 之后在 speech/config.json 把 tts_voxcpm.enabled 改为 true，
+# 并把克隆参考音频放到 voices/ 目录（*.wav），可选在 config 里配 ref_texts。

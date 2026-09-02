@@ -1,0 +1,16 @@
+{
+  "name": "vox-interview",
+  "version": "1.0.0",
+  "private": true,
+  "description": "语音面试助手 - 本地语音面试 Web 应用",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "msedge-tts": "^2.0.7",
+    "multer": "^2.3.0",
+    "ws": "^8.21.3"
+  }
+}
