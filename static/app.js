@@ -31,7 +31,7 @@ const DEFAULT_VOICE = 'zh-CN-XiaoxiaoNeural';
 const SNAP_KEY = 'vox_interview_snapshot';
 const $ = (id) => document.getElementById(id);
 
-// ---------- 全局状态 ----------
+// ---------- 全部状态 ----------
 let state = {
   config: null,   // 冻结的配置快照 (开始后不可改)
   started: false,
@@ -56,6 +56,7 @@ let thirdActive = false;
 let currentAudio = null;
 let currentBubble = null;
 let toastTimer = null;
+let resumeParsed = '';   // 解析后的简历文本（面试配置面板）
 
 // ---------- 实时语音模式状态 ----------
 const rt = {
@@ -75,6 +76,7 @@ const rt = {
 function init() {
   fillVoices();
   bindEvents();
+  bindResume();
   setupTtsVisible();
   setupSttVisible();
   initLlmControls();
@@ -82,6 +84,52 @@ function init() {
   const snap = loadSnapshot();
   if (snap && snap.started && !snap.ended) {
     $('resumeBar').hidden = false;
+  }
+}
+
+// ---------- 简历上传与解析 ----------
+function bindResume() {
+  $('inResume').addEventListener('change', handleResumeFile);
+  $('btnClearResume').addEventListener('click', () => {
+    resumeParsed = '';
+    $('inResume').value = '';
+    $('resumePreview').value = '';
+    $('resumePreview').disabled = true;
+    $('resumeStatus').textContent = '';
+    $('resumeStatus').style.color = '';
+    $('btnClearResume').hidden = true;
+  });
+  // 预览区可手动修正解析结果
+  $('resumePreview').addEventListener('input', () => {
+    resumeParsed = $('resumePreview').value;
+  });
+}
+
+async function handleResumeFile() {
+  const f = $('inResume').files[0];
+  if (!f) return;
+  const st = $('resumeStatus');
+  st.textContent = '正在解析 ' + f.name + ' …';
+  st.style.color = '';
+  try {
+    const fd = new FormData();
+    fd.append('file', f);
+    const r = await fetch('/api/resume', { method: 'POST', body: fd });
+    const d = await r.json();
+    if (!r.ok || !d.ok || d.text == null) {
+      st.textContent = '❌ ' + (d.error || '解析失败，请换一种格式');
+      st.style.color = 'var(--danger)';
+      return;
+    }
+    resumeParsed = d.text;
+    $('resumePreview').value = d.text;
+    $('resumePreview').disabled = false;
+    $('btnClearResume').hidden = false;
+    st.textContent = '✅ 已解析 ' + f.name + '，共 ' + d.chars + ' 字（可在下方预览 / 修正）';
+    st.style.color = 'var(--ok)';
+  } catch (e) {
+    st.textContent = '❌ 解析失败：' + e.message;
+    st.style.color = 'var(--danger)';
   }
 }
 
@@ -319,6 +367,7 @@ function gatherConfig() {
     bargeIn: $('inBargeIn').checked,    // 说话时打断面试官播报
     enableInterim: $('inInterim').checked,
     sens: Number($('inSens').value),    // 判停灵敏度 1~10
+    resumeText: resumeParsed.trim(),    // 简历（解析+手动修正后的文本）
   };
 }
 
@@ -450,6 +499,7 @@ async function askInterviewer() {
     job: state.config.job,
     llm: state.config.llm,
     history: state.history.map((m) => ({ role: m.role, content: m.content })),
+    resume: state.config.resumeText || '',
   };
   const res = await fetch('/api/chat', {
     method: 'POST',
@@ -1018,6 +1068,7 @@ async function endInterview() {
         job: state.config.job,
         llm: state.config.llm,
         history: state.history.map((m) => ({ role: m.role, content: m.content })),
+        resume: state.config.resumeText || '',
       }),
     });
     const data = await res.json().catch(() => ({}));
@@ -1053,6 +1104,7 @@ function buildRecord() {
     profile: cfg.profile,
     job: cfg.job,
     llm: llmInfo, // 不保存 apiKey
+    resume: cfg.resumeText || null,
     history: state.history,
     summary: state.summary,
   };

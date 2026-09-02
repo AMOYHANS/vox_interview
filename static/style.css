@@ -136,6 +136,11 @@ textarea { resize: vertical; }
 .third-box { background: #f7f9fd; border: 1px dashed var(--line); border-radius: 10px; padding: 10px; margin-top: 8px; }
 .inline { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; }
 .inline input[type=checkbox] { width: auto; margin: 0; }
+.resume-label { margin-top: 4px; }
+.resume-label textarea {
+  font-family: ui-monospace, "Consolas", "Microsoft YaHei", monospace;
+  font-size: 12.5px; line-height: 1.6;
+}
 .speech-banner {
   margin-top: 8px; padding: 8px 10px; border-radius: 8px; background: #fff7e6;
   border: 1px solid #f2dfb5; color: #8a6d1f; display: none;

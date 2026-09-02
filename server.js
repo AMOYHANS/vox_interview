@@ -20,6 +20,7 @@ const net = require('net');
 const { spawn } = require('child_process');
 const { WebSocket, WebSocketServer } = require('ws');
 const { MsEdgeTTS, OUTPUT_FORMAT } = require('msedge-tts');
+const mammoth = require('mammoth');
 
 const app = express();
 const PORT = process.env.PORT || 8000;
@@ -418,7 +419,7 @@ async function handleRealtimeWs(browserWs) {
 // ---------------------------------------------------------------------------
 // 面试官对话
 // ---------------------------------------------------------------------------
-function buildInterviewerSystem(profile = {}, job = {}) {
+function buildInterviewerSystem(profile = {}, job = {}, resume = '') {
   const p = (v) => (v == null ? '' : String(v)).trim();
   const name = p(profile.name) || '面试官';
   const title = p(profile.title) || '面试官';
@@ -430,15 +431,21 @@ function buildInterviewerSystem(profile = {}, job = {}) {
   if (p(profile.style)) lines.push(`你的沟通风格：${p(profile.style)}`);
   if (p(job.jd)) lines.push(`岗位要求：${p(job.jd)}`);
   if (p(job.focus)) lines.push(`本次面试考察重点：${p(job.focus)}`);
+  if (p(resume)) {
+    lines.push(
+      `候选人简历（务必细读，据此提出针对性问题，不要问简历里已写明的基本信息）：\n${String(resume).slice(0, 2500)}`
+    );
+  }
   lines.push(
     '面试规则：\n' +
     '1. 一次只问一个问题，追问要简短自然。\n' +
     '2. 先简短回应/认可候选人，再提出下一个问题或追问。\n' +
     '3. 全程用中文口语，每次回复控制在 2~3 句话以内，像真人面试官，不要长篇输出。\n' +
     '4. 开场时先做简短自我介绍并欢迎候选人，然后请候选人做自我介绍。\n' +
-    '5. 大约第 6~8 轮问答后，询问候选人是否有想反问的问题。\n' +
-    '6. 候选人明确表示没有问题时，礼貌收尾致谢。\n' +
-    '7. 直接输出你要说的话，绝不要输出任何思考过程、推理、内部规则复盘或额外说明。\n'
+    '5. 提问要贴着候选人的简历和自我介绍展开，追问其经历细节、项目难点与思考过程。\n' +
+    '6. 大约第 6~8 轮问答后，询问候选人是否有想反问的问题。\n' +
+    '7. 候选人明确表示没有问题时，礼貌收尾致谢。\n' +
+    '8. 直接输出你要说的话，绝不要输出任何思考过程、推理、内部规则复盘或额外说明。\n'
   );
   return lines.join('\n');
 }
@@ -449,15 +456,16 @@ app.post('/api/chat', async (req, res) => {
   const job = body.job || {};
   const llm = body.llm || {};
   const history = Array.isArray(body.history) ? body.history : [];
+  const resume = body.resume || '';
 
-  if (llm.apiKey) return chatWithLlm(profile, job, llm, history, res);
+  if (llm.apiKey) return chatWithLlm(profile, job, llm, history, resume, res);
   res.json({ reply: chatRule(profile, job, history), source: 'rule' });
 });
 
-async function chatWithLlm(profile, job, llm, history, res) {
+async function chatWithLlm(profile, job, llm, history, resume, res) {
   const baseUrl = (String(llm.baseUrl || 'https://api.openai.com/v1')).replace(/\/+$/, '');
   const model = llm.model || 'gpt-4o-mini';
-  const messages = [{ role: 'system', content: buildInterviewerSystem(profile, job) }];
+  const messages = [{ role: 'system', content: buildInterviewerSystem(profile, job, resume) }];
   for (const m of history) {
     if ((m.role === 'user' || m.role === 'assistant') && m.content) {
       messages.push({ role: m.role, content: String(m.content).slice(0, 2000) });
@@ -519,6 +527,54 @@ function chatRule(profile = {}, job = {}, history = []) {
 // 面试总结
 // ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
+// 简历解析
+// ---------------------------------------------------------------------------
+const RESUME_MAX_CHARS = 60000;
+
+async function parseResumeBuffer(buffer, ext) {
+  let text = '';
+  const lower = String(ext || '').toLowerCase();
+  if (lower === 'pdf') {
+    const { extractText } = await import('unpdf');
+    const r = await extractText(new Uint8Array(buffer));
+    text = (Array.isArray(r.text) ? r.text : []).join('\n');
+  } else if (lower === 'docx') {
+    const r = await mammoth.extractRawText({ buffer });
+    text = r.value || '';
+  } else if (lower === 'txt' || lower === 'text' || lower === 'md') {
+    const buf = Buffer.from(buffer);
+    text = buf.toString('utf8');
+    if (text.includes('\uFFFD')) {
+      try { text = new TextDecoder('gb18030').decode(buf); } catch (e) { /* 保留原结果 */ }
+    }
+  } else {
+    throw new Error(lower === 'doc'
+      ? '暂不支持旧版 .doc，请用 Word 另存为 .docx 或导出为 .pdf 后再上传'
+      : '不支持的文件格式：.' + (lower || '?') + '（支持 pdf / docx / txt / md）');
+  }
+  text = text
+    .replace(/\r\n?/g, '\n')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  if (!text) {
+    throw new Error('未能从文件中解析出文本（扫描件 PDF 暂不支持 OCR，请上传文字版）');
+  }
+  return text.slice(0, RESUME_MAX_CHARS);
+}
+
+app.post('/api/resume', upload.single('file'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: '缺少文件' });
+  const ext = (req.file.originalname || '').split('.').pop();
+  try {
+    const text = await parseResumeBuffer(req.file.buffer, ext);
+    res.json({ ok: true, text, chars: text.length, ext });
+  } catch (e) {
+    res.status(422).json({ error: e.message || String(e) });
+  }
+});
+
+// ---------------------------------------------------------------------------
 // 大模型连通性测试
 // ---------------------------------------------------------------------------
 app.post('/api/llm/test', async (req, res) => {
@@ -574,15 +630,16 @@ app.post('/api/summary', async (req, res) => {
   const job = body.job || {};
   const llm = body.llm || {};
   const history = Array.isArray(body.history) ? body.history : [];
+  const resume = body.resume || '';
 
   if (llm.apiKey) {
-    const result = await summaryWithLlm(profile, job, llm, history);
+    const result = await summaryWithLlm(profile, job, llm, history, resume);
     if (result) return res.json(result);
   }
   res.json(summaryRule(profile, job, history));
 });
 
-async function summaryWithLlm(profile, job, llm, history) {
+async function summaryWithLlm(profile, job, llm, history, resume) {
   const baseUrl = (String(llm.baseUrl || 'https://api.openai.com/v1')).replace(/\/+$/, '');
   const model = llm.model || 'gpt-4o-mini';
   const transcript = history
@@ -597,7 +654,8 @@ async function summaryWithLlm(profile, job, llm, history) {
     '"weaknesses": ["不足1","不足2"], "advice": ["建议1","建议2","建议3"], "hire": "建议录用/待定/建议不录用"}\n' +
     `应聘职位：${job.title || '未知'}；公司：${job.company || '未知'}。\n` +
     `岗位要求：${String(job.jd || '').slice(0, 2000)}\n` +
-    `考察重点：${String(job.focus || '').slice(0, 1000)}\n\n` +
+    `考察重点：${String(job.focus || '').slice(0, 1000)}\n` +
+    (resume ? `候选人简历：${String(resume).slice(0, 2500)}\n` : '') +
     `面试记录：\n${transcript}\n\n请输出 JSON：`;
   try {
     const r = await fetch(baseUrl + '/chat/completions', {

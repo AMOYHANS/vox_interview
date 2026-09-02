@@ -78,6 +78,22 @@
         </label>
       </fieldset>
 
+      <fieldset id="fsResume">
+        <legend>📄 简历（可选）</legend>
+        <p class="hint">上传简历（pdf / docx / txt / md），自动解析成文本并加入面试官上下文，提问会贴着你的简历来。<b>扫描件 PDF 暂不支持 OCR</b>。</p>
+        <div class="row">
+          <label class="grow">
+            选择文件
+            <input type="file" id="inResume" accept=".pdf,.docx,.doc,.txt,.md,.text" />
+          </label>
+          <button id="btnClearResume" class="btn ghost" type="button" hidden>清空</button>
+        </div>
+        <div id="resumeStatus" class="hint"></div>
+        <label class="resume-label">解析结果预览（可手动修正）
+          <textarea id="resumePreview" rows="6" placeholder="上传后这里会显示解析出的文本" disabled></textarea>
+        </label>
+      </fieldset>
+
       <fieldset id="fsLLM">
         <legend>🧠 面试官大脑（大模型）</legend>
         <p class="hint">兼容任意 OpenAI 格式接口。<b>未配置 Token 时使用内置提问脚本</b>，也能走通流程。填好 API Key 即自动接入 AI。</p>
