@@ -907,9 +907,24 @@ function onRecError(e) {
 }
 
 function stopBrowserRecording() {
-  if (recActive) {
-    try { rec.stop(); } catch (e) { recActive = false; setMicRec(false); hideLive(); }
-  }
+  if (!recActive) return;
+  // 立即置为已停止，避免 onend 再走一遍提交逻辑（有的内核 stop() 不触发 onend）
+  recActive = false;
+  clearTimeout(recSilenceTimer);
+  setMicRec(false);
+  hideLive();
+  try { rec.stop(); } catch (e) { /* ignore */ }
+  // 稍等收尾帧（final 结果），然后手动提交本轮识别文本
+  setTimeout(() => {
+    const text = (recFinal || '').trim();
+    if (text) {
+      showLive('识别完成，正在发送…');
+      setTimeout(() => { hideLive(); submitUserText(text, 'voice'); }, 350);
+    } else {
+      hideLive();
+      toast('没有识别到内容，请再试一次');
+    }
+  }, 450);
 }
 
 function setMicRec(on) {
