@@ -75,26 +75,32 @@ function llmErrorHint(status, rawText) {
 }
 
 /**
- * 剥掉推理模型（如 MiniMax-M3）拼进 content 里的思考过程：
- * "thinking <推理文本>\n\n<最终回答>"，只保留最终回答。
+ * 剥掉推理模型（如 MiniMax-M3）拼进 content 里的思考过程，只保留最终回答：
+ * 1) 带标记前缀: "thinking <…>" / "**thinking** …" / "思考：…" / ```thinking …``` / <thinking>…
+ * 2) 无标记但整段是自述推理: "候选人说…我应该…\n\n<真正要说的对话>"
  */
 function stripReasoning(content) {
   let text = String(content || '').trim();
-  // 常见推理前缀: thinking / reasoning / **thinking** / ```thinking / <thinking> / 思考
+  // 1) 带标记的思考块
   const m = text.match(
     /^(?:\*{0,3}thinking\*{0,3}|reasoning|思考过程\s*[:：]?|思考\s*[:：]?|```(?:thinking|reasoning)|<\s*thinking\s*>|<\|thinking\|>|##+\s*.*(?:thinking|思考)|\[thinking\])[\s\S]*?(?:\n[ \t]*\n|<\s*\/\s*thinking\s*>\s*\n|```\s*\n)/
   );
   if (m) {
-    text = text.slice(m[0].length).trim();
-    if (text) return text;
+    const rest = text.slice(m[0].length).trim();
+    if (rest) text = rest;
   }
-  // 兜底：以 "thinking" 开头但没空行分隔时，去掉从开头到第一个换行
-  if (/^thinking\b/i.test(text)) {
-    const nl = text.indexOf('\n');
-    if (nl > 0 && nl < 400) text = text.slice(nl + 1).trim();
-    if (text) return text;
+  // 2) 无标记的推理段落：前面的整段像模型自述/分析时，只保留最后一段对话
+  const blocks = text.split(/\n[ \t]*\n+/).map((b) => b.trim()).filter(Boolean);
+  if (blocks.length >= 2) {
+    const head = blocks.slice(0, -1).join('\n');
+    const last = blocks[blocks.length - 1];
+    // 推理信号：第三人称分析候选人 / 心理猜测 / 流程自述等；排除"我理解你的意思了"这类正常衔接
+    const reasoningRe = /(候选人|这位(?:求职者|朋友)|candidate|the user|the candidate|我应该|我应当|我需要|我打算|我准备|可能是在|似乎|看起来|推测|心理|紧张|测试连接|鼓励|引导|让候选人|让ta|根据(?:规则|要求)|首先(?:我|要|需要)|用(?:这种方式|这个思路)|这段(?:内容|回复))/i;
+    if (head.length >= 25 && reasoningRe.test(head) && last.length <= 350) {
+      text = last;
+    }
   }
-  return String(content || '').trim();
+  return text.trim() || String(content || '').trim();
 }
 
 // ---------------------------------------------------------------------------
@@ -466,7 +472,10 @@ async function chatWithLlm(profile, job, llm, history, res) {
     const r = await fetch(baseUrl + '/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + llm.apiKey },
-      body: JSON.stringify({ model, messages: trimmed, temperature: 0.8, max_tokens: 400 }),
+      body: JSON.stringify({
+        model, messages: trimmed, temperature: 0.8, max_tokens: 400,
+        ...(llm.disableThinking ? { thinking: { type: 'disabled' } } : {}),
+      }),
     });
     const data = await r.json().catch(() => ({}));
     if (!r.ok) {
@@ -528,6 +537,7 @@ app.post('/api/llm/test', async (req, res) => {
         model: model || 'gpt-4o-mini',
         messages: [{ role: 'user', content: '请只回复两个字：正常' }],
         max_tokens: 16,
+        ...(body.disableThinking ? { thinking: { type: 'disabled' } } : {}),
       }),
       signal: AbortSignal.timeout(20000),
     });

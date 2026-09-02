@@ -132,6 +132,7 @@ async function testLlmConnection() {
         baseUrl: $('inLlmUrl').value.trim(),
         apiKey: $('inLlmKey').value.trim(),
         model: $('inLlmModel').value.trim(),
+        disableThinking: $('inDisableThinking').checked,
       }),
     });
     const d = await r.json();
@@ -305,6 +306,7 @@ function gatherConfig() {
       baseUrl: $('inLlmUrl').value.trim(),
       apiKey: $('inLlmKey').value.trim(),
       model: $('inLlmModel').value.trim(),
+      disableThinking: $('inDisableThinking').checked,
     },
     tts,
     stt: {

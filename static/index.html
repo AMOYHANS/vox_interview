@@ -97,6 +97,7 @@
           <label>Token（API Key）<input id="inLlmKey" type="password" placeholder="sk-..." /></label>
         </div>
         <label>模型名称<input id="inLlmModel" value="deepseek-chat" placeholder="如 deepseek-chat / gpt-4o-mini" /></label>
+        <label class="inline"><input type="checkbox" id="inDisableThinking" checked /> 关闭模型思考输出（推理模型如 MiniMax M3 会默认输出内部思考）</label>
         <div class="row">
           <button id="btnTestLlm" class="btn" type="button">🔌 测试连通性</button>
           <span class="grow"></span>
