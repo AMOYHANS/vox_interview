@@ -304,9 +304,10 @@ class TurnEngine:
         self.enable_interim = bool(cfg.get("stt", {}).get("enable_interim", False))
         self.min_speech = int(self.vcfg.get("min_speech_ms", 150)) * SR // 1000
         # 判停主参数（可在 session 里被前端覆盖）
-        self.smart_threshold = float(self.scfg.get("threshold", 0.6))
+        self.smart_threshold = float(self.scfg.get("threshold", 0.7))
         self.smart_max_wait_ms = int(self.scfg.get("max_wait_ms", 3000))
-        self.short_wait_ms = int(self.scfg.get("short_wait_ms", 1400))  # 短段缓冲
+        self.short_wait_ms = int(self.scfg.get("short_wait_ms", 1000))  # 短段缓冲
+        self.grace_ms = int(self.scfg.get("grace_ms", 650))  # 判"已说完"后仍压住的重开宽限
         self.commit_short = int(self.vcfg.get("commit_short_ms", 450)) * SR // 1000
         self.smart: SmartTurn | None = None
         self.stt: SenseVoice | None = None
@@ -338,6 +339,8 @@ class TurnEngine:
             self.smart_max_wait_ms = int(min(8000, max(800, params["smart_max_wait_ms"])))
         if params.get("short_wait_ms"):
             self.short_wait_ms = int(min(4000, max(400, params["short_wait_ms"])))
+        if params.get("grace_ms"):
+            self.grace_ms = int(min(4000, max(250, params["grace_ms"])))
         if params.get("enable_interim") is not None:
             self.enable_interim = bool(params["enable_interim"])
 
@@ -364,6 +367,7 @@ class TurnEngine:
                 "smart_threshold": self.smart_threshold,
                 "smart_max_wait_ms": self.smart_max_wait_ms,
                 "short_wait_ms": self.short_wait_ms,
+                "grace_ms": self.grace_ms,
             },
             "stat": self.stat,
             "last_decision": self.last_decision,
@@ -423,7 +427,8 @@ class TurnEngine:
                 )
                 if prob >= self.smart.threshold:
                     self.stat["smart_commits"] += 1
-                    self._commit_now(seg)
+                    # 判"已说完"也先压一段重开宽限：期间接着说就并回同句（避免稍停即被打断）
+                    self._hold(seg, self.grace_ms)
                     return
                 self.stat["smart_holds"] += 1
                 self._hold(seg, self.smart_max_wait_ms)

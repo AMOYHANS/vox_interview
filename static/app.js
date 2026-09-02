@@ -322,12 +322,13 @@ function gatherConfig() {
 
 /** 灵敏度(1~10) → 判停参数 */
 function sensParams(s) {
-  s = Math.max(1, Math.min(10, s || 5));
+  s = Math.max(1, Math.min(10, s || 7));
   return {
-    vad_min_silence_ms: 60 + (s - 1) * 60,                    // 60 ~ 600
-    smart_threshold: Math.min(0.9, 0.5 + (s - 1) * 0.045),    // 0.50 ~ 0.90
-    smart_max_wait_ms: 1500 + (s - 1) * 390,                  // 1.5s ~ 5s
-    short_wait_ms: 800 + (s - 1) * 80,                        // 0.8s ~ 1.5s
+    vad_min_silence_ms: 100 + (s - 1) * 55,                  // 100 ~ 595
+    smart_threshold: Math.min(0.9, 0.55 + (s - 1) * 0.04),   // 0.55 ~ 0.91
+    smart_max_wait_ms: 1800 + (s - 1) * 400,                 // 1.8s ~ 5.4s
+    short_wait_ms: 900 + (s - 1) * 120,                      // 0.9s ~ 2.0s
+    grace_ms: 400 + (s - 1) * 90,                            // 0.4s ~ 1.2s (重开宽限)
   };
 }
 

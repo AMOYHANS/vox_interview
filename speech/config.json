@@ -11,9 +11,10 @@
   },
   "smart_turn": {
     "enabled": true,
-    "threshold": 0.65,
+    "threshold": 0.7,
     "max_wait_ms": 3000,
-    "short_wait_ms": 1400,
+    "short_wait_ms": 1000,
+    "grace_ms": 650,
     "model_path": null,
     "repo_id": "pipecat-ai/smart-turn-v3",
     "filename": "smart-turn-v3.2-cpu.onnx"
