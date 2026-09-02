@@ -419,7 +419,7 @@ async function handleRealtimeWs(browserWs) {
 // ---------------------------------------------------------------------------
 // 面试官对话
 // ---------------------------------------------------------------------------
-function buildInterviewerSystem(profile = {}, job = {}, resume = '') {
+function buildInterviewerSystem(profile = {}, job = {}, resume = '', reference = '') {
   const p = (v) => (v == null ? '' : String(v)).trim();
   const name = p(profile.name) || '面试官';
   const title = p(profile.title) || '面试官';
@@ -436,13 +436,18 @@ function buildInterviewerSystem(profile = {}, job = {}, resume = '') {
       `候选人简历（务必细读，据此提出针对性问题，不要问简历里已写明的基本信息）：\n${String(resume).slice(0, 2500)}`
     );
   }
+  if (p(reference)) {
+    lines.push(
+      `面试参考资料（提问依据，请结合其内容向候选人提问或考察其对资料涉及领域的理解）：\n${String(reference).slice(0, 4000)}`
+    );
+  }
   lines.push(
     '面试规则：\n' +
     '1. 一次只问一个问题，追问要简短自然。\n' +
     '2. 先简短回应/认可候选人，再提出下一个问题或追问。\n' +
     '3. 全程用中文口语，每次回复控制在 2~3 句话以内，像真人面试官，不要长篇输出。\n' +
     '4. 开场时先做简短自我介绍并欢迎候选人，然后请候选人做自我介绍。\n' +
-    '5. 提问要贴着候选人的简历和自我介绍展开，追问其经历细节、项目难点与思考过程。\n' +
+    '5. 提问要贴着候选人的简历、自我介绍和「面试参考资料」展开，追问其经历细节、项目难点与思考过程。\n' +
     '6. 大约第 6~8 轮问答后，询问候选人是否有想反问的问题。\n' +
     '7. 候选人明确表示没有问题时，礼貌收尾致谢。\n' +
     '8. 直接输出你要说的话，绝不要输出任何思考过程、推理、内部规则复盘或额外说明。\n'
@@ -457,15 +462,16 @@ app.post('/api/chat', async (req, res) => {
   const llm = body.llm || {};
   const history = Array.isArray(body.history) ? body.history : [];
   const resume = body.resume || '';
+  const reference = body.reference || '';
 
-  if (llm.apiKey) return chatWithLlm(profile, job, llm, history, resume, res);
+  if (llm.apiKey) return chatWithLlm(profile, job, llm, history, resume, reference, res);
   res.json({ reply: chatRule(profile, job, history), source: 'rule' });
 });
 
-async function chatWithLlm(profile, job, llm, history, resume, res) {
+async function chatWithLlm(profile, job, llm, history, resume, reference, res) {
   const baseUrl = (String(llm.baseUrl || 'https://api.openai.com/v1')).replace(/\/+$/, '');
   const model = llm.model || 'gpt-4o-mini';
-  const messages = [{ role: 'system', content: buildInterviewerSystem(profile, job, resume) }];
+  const messages = [{ role: 'system', content: buildInterviewerSystem(profile, job, resume, reference) }];
   for (const m of history) {
     if ((m.role === 'user' || m.role === 'assistant') && m.content) {
       messages.push({ role: m.role, content: String(m.content).slice(0, 2000) });
@@ -631,15 +637,16 @@ app.post('/api/summary', async (req, res) => {
   const llm = body.llm || {};
   const history = Array.isArray(body.history) ? body.history : [];
   const resume = body.resume || '';
+  const reference = body.reference || '';
 
   if (llm.apiKey) {
-    const result = await summaryWithLlm(profile, job, llm, history, resume);
+    const result = await summaryWithLlm(profile, job, llm, history, resume, reference);
     if (result) return res.json(result);
   }
   res.json(summaryRule(profile, job, history));
 });
 
-async function summaryWithLlm(profile, job, llm, history, resume) {
+async function summaryWithLlm(profile, job, llm, history, resume, reference) {
   const baseUrl = (String(llm.baseUrl || 'https://api.openai.com/v1')).replace(/\/+$/, '');
   const model = llm.model || 'gpt-4o-mini';
   const transcript = history
@@ -656,6 +663,7 @@ async function summaryWithLlm(profile, job, llm, history, resume) {
     `岗位要求：${String(job.jd || '').slice(0, 2000)}\n` +
     `考察重点：${String(job.focus || '').slice(0, 1000)}\n` +
     (resume ? `候选人简历：${String(resume).slice(0, 2500)}\n` : '') +
+    (reference ? `面试参考资料：${String(reference).slice(0, 4000)}\n` : '') +
     `面试记录：\n${transcript}\n\n请输出 JSON：`;
   try {
     const r = await fetch(baseUrl + '/chat/completions', {

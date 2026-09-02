@@ -77,6 +77,7 @@ function init() {
   fillVoices();
   bindEvents();
   bindResume();
+  bindRef();
   setupTtsVisible();
   setupSttVisible();
   initLlmControls();
@@ -85,6 +86,60 @@ function init() {
   if (snap && snap.started && !snap.ended) {
     $('resumeBar').hidden = false;
   }
+}
+
+// ---------- 面试参考资料：上传 → 逐份解析 → 合并预览 ----------
+let refParsed = '';   // 各份资料合并后的文本
+
+function bindRef() {
+  $('inRef').addEventListener('change', handleRefFiles);
+  $('btnClearRef').addEventListener('click', () => {
+    refParsed = '';
+    $('inRef').value = '';
+    $('refPreview').value = '';
+    $('refPreview').disabled = true;
+    $('refStatus').textContent = '';
+    $('refStatus').style.color = '';
+    $('btnClearRef').hidden = true;
+    $('btnClearRef').dataset.done = '0';
+  });
+  $('refPreview').addEventListener('input', () => {
+    refParsed = $('refPreview').value;
+  });
+}
+
+async function handleRefFiles() {
+  const files = Array.from($('inRef').files || []);
+  if (!files.length) return;
+  const st = $('refStatus');
+  const parts = [];
+  let okCount = 0;
+  for (const f of files) {
+    st.textContent = '正在解析 ' + f.name + ' …';
+    st.style.color = '';
+    try {
+      const fd = new FormData();
+      fd.append('file', f);
+      const r = await fetch('/api/resume', { method: 'POST', body: fd });
+      const d = await r.json();
+      if (!r.ok || !d.ok || d.text == null) {
+        parts.push('【' + f.name + '】（解析失败：' + (d.error || '不支持该格式') + '）');
+        continue;
+      }
+      okCount++;
+      parts.push('【' + f.name + '】\n' + d.text);
+    } catch (e) {
+      parts.push('【' + f.name + '】（解析失败：' + e.message + '）');
+    }
+  }
+  refParsed = parts.join('\n\n');
+  $('refPreview').value = refParsed;
+  $('refPreview').disabled = false;
+  $('btnClearRef').hidden = false;
+  st.style.color = okCount === files.length ? 'var(--ok)' : 'var(--danger)';
+  st.textContent = okCount
+    ? '✅ 已解析 ' + okCount + '/' + files.length + ' 份资料，共 ' + refParsed.length + ' 字（可在下方预览 / 修正）'
+    : '❌ 全部解析失败';
 }
 
 // ---------- 简历上传与解析 ----------
@@ -368,6 +423,7 @@ function gatherConfig() {
     enableInterim: $('inInterim').checked,
     sens: Number($('inSens').value),    // 判停灵敏度 1~10
     resumeText: resumeParsed.trim(),    // 简历（解析+手动修正后的文本）
+    refText: refParsed.trim(),          // 面试参考资料（合并文本）
   };
 }
 
@@ -507,6 +563,7 @@ async function askInterviewer() {
     llm: state.config.llm,
     history: state.history.map((m) => ({ role: m.role, content: m.content })),
     resume: state.config.resumeText || '',
+    reference: state.config.refText || '',
   };
   const res = await fetch('/api/chat', {
     method: 'POST',
@@ -1076,6 +1133,7 @@ async function endInterview() {
         llm: state.config.llm,
         history: state.history.map((m) => ({ role: m.role, content: m.content })),
         resume: state.config.resumeText || '',
+        reference: state.config.refText || '',
       }),
     });
     const data = await res.json().catch(() => ({}));
@@ -1116,6 +1174,7 @@ function buildRecord() {
     job: cfg.job,
     llm: llmInfo, // 不保存 apiKey
     resume: cfg.resumeText || null,
+    reference: cfg.refText || null,
     history: state.history,
     summary: state.summary,
   };

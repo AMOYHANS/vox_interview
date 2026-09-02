@@ -68,13 +68,13 @@
         <legend>💼 职位信息</legend>
         <div class="grid2">
           <label>公司<input id="inCompany" value="示例科技有限公司" /></label>
-          <label>职位名称<input id="inJobTitle" value="前端开发工程师" /></label>
+          <label>职位名称<input id="inJobTitle" value="AI Agent 开发工程师" /></label>
         </div>
         <label>职位描述 / 任职要求
-          <textarea id="inJd" rows="3">负责公司核心产品 Web 前端开发；熟练使用 Vue / React；3 年以上前端开发经验；具备良好的代码质量意识与团队协作能力。</textarea>
+          <textarea id="inJd" rows="3">负责 AI Agent（智能体）相关产品与业务场景的设计与开发；熟悉大模型 API 接入、提示词工程（Prompt Engineering）；具备 RAG、函数调用（Function Calling）、多轮对话编排经验者优先；熟练使用 Python 或 TypeScript。</textarea>
         </label>
         <label>考察重点
-          <textarea id="inFocus" rows="2">项目经验真实性；技术深度与方案设计；沟通表达与逻辑；团队协作与主动性。</textarea>
+          <textarea id="inFocus" rows="2">大模型应用与提示词工程；RAG 与工具调用理解；Agent 方案设计落地；系统架构与工程化；逻辑表达与沟通。</textarea>
         </label>
       </fieldset>
 
@@ -91,6 +91,22 @@
         <div id="resumeStatus" class="hint"></div>
         <label class="resume-label">解析结果预览（可手动修正）
           <textarea id="resumePreview" rows="6" placeholder="上传后这里会显示解析出的文本" disabled></textarea>
+        </label>
+      </fieldset>
+
+      <fieldset id="fsRef">
+        <legend>📚 面试参考资料（可选）</legend>
+        <p class="hint">上传面试官需要参考的问题资料（可多选：pdf / docx / txt / md），自动解析成文本供预览，并作为面试官提问的依据，面试官会结合资料内容向你提问。<b>扫描件 PDF 暂不支持 OCR</b>。</p>
+        <div class="row">
+          <label class="grow">
+            选择文件（可多选）
+            <input type="file" id="inRef" accept=".pdf,.docx,.doc,.txt,.md,.text" multiple />
+          </label>
+          <button id="btnClearRef" class="btn ghost" type="button" hidden>清空</button>
+        </div>
+        <div id="refStatus" class="hint"></div>
+        <label class="resume-label">资料解析预览（可手动修正）
+          <textarea id="refPreview" rows="6" placeholder="上传后这里会合并展示各份资料的解析文本" disabled></textarea>
         </label>
       </fieldset>
 
