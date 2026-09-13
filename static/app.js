@@ -97,12 +97,11 @@ function bindRef() {
     refParsed = '';
     $('inRef').value = '';
     $('refPreview').value = '';
-    $('refPreview').disabled = true;
     $('refStatus').textContent = '';
     $('refStatus').style.color = '';
     $('btnClearRef').hidden = true;
-    $('btnClearRef').dataset.done = '0';
   });
+  // 文本区默认可编辑：直接粘贴/输入即作为参考资料；上传解析则自动填充
   $('refPreview').addEventListener('input', () => {
     refParsed = $('refPreview').value;
   });
@@ -134,7 +133,6 @@ async function handleRefFiles() {
   }
   refParsed = parts.join('\n\n');
   $('refPreview').value = refParsed;
-  $('refPreview').disabled = false;
   $('btnClearRef').hidden = false;
   st.style.color = okCount === files.length ? 'var(--ok)' : 'var(--danger)';
   st.textContent = okCount
@@ -149,12 +147,11 @@ function bindResume() {
     resumeParsed = '';
     $('inResume').value = '';
     $('resumePreview').value = '';
-    $('resumePreview').disabled = true;
     $('resumeStatus').textContent = '';
     $('resumeStatus').style.color = '';
     $('btnClearResume').hidden = true;
   });
-  // 预览区可手动修正解析结果
+  // 文本区默认可编辑：直接粘贴/输入即作为简历；上传解析则自动填充
   $('resumePreview').addEventListener('input', () => {
     resumeParsed = $('resumePreview').value;
   });
@@ -178,7 +175,6 @@ async function handleResumeFile() {
     }
     resumeParsed = d.text;
     $('resumePreview').value = d.text;
-    $('resumePreview').disabled = false;
     $('btnClearResume').hidden = false;
     st.textContent = '✅ 已解析 ' + f.name + '，共 ' + d.chars + ' 字（可在下方预览 / 修正）';
     st.style.color = 'var(--ok)';
