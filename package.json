@@ -21,12 +21,17 @@
     "ws": "^8.21.3"
   },
   "devDependencies": {
+    "@noble/hashes": "^1.8.0",
     "electron": "^44.3.0",
     "electron-builder": "^26.15.3"
+  },
+  "overrides": {
+    "@noble/hashes": "^1.8.0"
   },
   "build": {
     "appId": "com.voxinterview.desktop",
     "productName": "语音面试助手",
+    "electronDist": "node_modules/electron/dist",
     "directories": {
       "output": "dist"
     },
