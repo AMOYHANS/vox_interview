@@ -106,7 +106,22 @@ def main() -> None:
     ap.add_argument("--with-voxcpm", action="store_true", help="一并安装 VoxCPM 克隆音色 TTS（较大）")
     ap.add_argument("--probe", action="store_true", help="装完后下载模型并做全链路自检")
     ap.add_argument("--system", action="store_true", help="不建 venv，直接装到当前 Python")
+    ap.add_argument("--check", action="store_true", help="检测本地语音服务是否已安装（退出码 0/1）")
     args = ap.parse_args()
+
+    if args.check:
+        import json as _json
+
+        try:
+            rt = _json.loads(RUNTIME.read_text("utf-8"))
+            py = rt.get("python")
+            if py and Path(py).exists():
+                log(f"已安装: {py}")
+                sys.exit(0)
+            log(f"runtime.json 存在但 python 不可用: {py}")
+        except Exception:
+            log("未检测到本地语音服务（缺少 speech/runtime.json）")
+        sys.exit(1)
 
     py = find_python()
     proxy = resolve_proxy()
