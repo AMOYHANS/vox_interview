@@ -775,20 +775,55 @@ app.delete('/api/records/:rid', (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-const httpServer = app.listen(PORT, '127.0.0.1', () => {
-  const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
-  wss.on('connection', (ws) => handleRealtimeWs(ws));
-  console.log('='.repeat(52));
-  console.log('  语音面试助手已启动');
-  console.log(`  请在浏览器中打开: http://127.0.0.1:${PORT}`);
-  console.log('  按 Ctrl+C 停止服务');
-  console.log('='.repeat(52));
-  // 尝试拉起本地语音服务（后台，不阻塞）
-  ensureSpeechService().then((level) => {
-    console.log(`[speech] 本地语音服务状态: ${level}`);
-    if (level === 'not-installed') {
-      console.log('[speech] 未检测到语音服务。实时语音模式需要先运行 setup_speech.bat 安装。');
-      console.log('[speech] 不安装也能用「手动模式」（按键说话/打字）继续面试。');
-    }
+// 启动/停止（可被 Electron 内嵌，也可命令行直接运行）
+// ---------------------------------------------------------------------------
+let _httpServer = null;
+let _wss = null;
+
+function startServer(port = PORT) {
+  return new Promise((resolve, reject) => {
+    _httpServer = app.listen(port, '127.0.0.1', () => {
+      const actual = _httpServer.address().port;
+      _wss = new WebSocketServer({ server: _httpServer, path: '/ws' });
+      _wss.on('connection', (ws) => handleRealtimeWs(ws));
+      console.log('='.repeat(52));
+      console.log('  语音面试助手已启动');
+      console.log(`  请在浏览器中打开: http://127.0.0.1:${actual}`);
+      console.log('  按 Ctrl+C 停止服务');
+      console.log('='.repeat(52));
+      // 尝试拉起本地语音服务（后台，不阻塞）
+      ensureSpeechService().then((level) => {
+        console.log(`[speech] 本地语音服务状态: ${level}`);
+        if (level === 'not-installed') {
+          console.log('[speech] 未检测到语音服务。实时语音模式需要先运行 setup_speech.bat 安装。');
+          console.log('[speech] 不安装也能用「手动模式」（按键说话/打字）继续面试。');
+        }
+      });
+      resolve(actual);
+    });
+    _httpServer.on('error', (err) => reject(err));
   });
-});
+}
+
+function stopServer() {
+  try { if (_wss) _wss.close(); } catch (e) { /* ignore */ }
+  try { if (_httpServer) _httpServer.close(); } catch (e) { /* ignore */ }
+  _wss = null;
+  _httpServer = null;
+}
+
+function stopSpeechService() {
+  try {
+    if (speechProc && typeof speechProc.kill === 'function') speechProc.kill();
+  } catch (e) { /* ignore */ }
+  speechProc = null;
+}
+
+if (require.main === module) {
+  startServer().catch((e) => {
+    console.error('[server] 启动失败:', e.message);
+    process.exit(1);
+  });
+}
+
+module.exports = { app, startServer, stopServer, stopSpeechService };

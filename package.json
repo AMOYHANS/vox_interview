@@ -2,10 +2,13 @@
   "name": "vox-interview",
   "version": "1.0.0",
   "private": true,
-  "description": "语音面试助手 - 本地语音面试 Web 应用",
-  "main": "server.js",
+  "description": "语音面试助手 - 本地语音面试 Web / Electron 应用",
+  "main": "electron/main.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "app": "electron .",
+    "dist": "electron-builder --win",
+    "dist:dir": "electron-builder --win --dir"
   },
   "dependencies": {
     "express": "^5.2.1",
@@ -14,5 +17,36 @@
     "multer": "^2.3.0",
     "unpdf": "^1.8.1",
     "ws": "^8.21.3"
+  },
+  "devDependencies": {
+    "electron": "^44.3.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.voxinterview.desktop",
+    "productName": "语音面试助手",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "electron/**",
+      "server.js",
+      "static/**",
+      "speech/server.py",
+      "speech/config.json",
+      "speech/requirements.txt",
+      "package.json"
+    ],
+    "asar": false,
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    }
   }
 }
