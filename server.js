@@ -216,6 +216,97 @@ app.get('/api/speech/status', async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// 环境初始化（页面按钮调用）：检查就绪度，缺失依赖则自动安装并回显日志(SSE)
+// ---------------------------------------------------------------------------
+let envSetupBusy = false;
+
+function* candidatePythons() {
+  loadSpeechRuntime();
+  if (speechRuntime && speechRuntime.python) yield speechRuntime.python;
+  yield 'python';
+  if (process.platform === 'win32') yield 'py';
+}
+
+app.post('/api/speech/setup', (req, res) => {
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive',
+    'X-Accel-Buffering': 'no',
+  });
+  const send = (type, msg, extra = {}) => {
+    try { res.write('data: ' + JSON.stringify(Object.assign({ type, msg }, extra)) + '\n\n'); } catch (e) { /* ignore */ }
+  };
+
+  const runSetup = () => new Promise((resolve) => {
+    const script = path.join(__dirname, 'scripts', 'setup_speech.py');
+    const tryCmd = (cmd) => new Promise((r) => {
+      let p;
+      try {
+        p = spawn(cmd, [script, '--probe'], { cwd: __dirname, windowsHide: true });
+      } catch (e) { r({ err: e }); return; }
+      p.stdout.on('data', (d) => send('line', d.toString().replace(/\r?\n$/g, '') + '\n'));
+      p.stderr.on('data', (d) => send('err', d.toString()));
+      p.on('error', (e) => { send('error', '无法启动 Python：' + e.message + '（请先安装 Python 3.10~3.14）'); r({ err: e }); });
+      p.on('close', (code) => r({ code }));
+    });
+    (async () => {
+      for (const cmd of candidatePythons()) {
+        const { err, code } = await tryCmd(cmd);
+        if (!err) { resolve(code === 0); return; }
+      }
+      resolve(false);
+    })();
+  });
+
+  (async () => {
+    if (envSetupBusy) { send('error', '已有环境初始化正在进行，请稍候'); return res.end(); }
+    envSetupBusy = true;
+    try {
+      const st = await speechServiceStatus();
+      if (st.level === 'running') {
+        const s = st.service || {};
+        send('line', '本地语音服务已就绪，无需安装。\n');
+        send('ready', '环境已就绪', { installed: true, vad: !!s.vad, smartturn: !!s.smartturn, stt: !!s.stt });
+        return;
+      }
+      // 未运行：先确保/等待服务起来（兼容「启动中」与「已装未起」两种情况，绝不重复安装）
+      ensureSpeechService();
+      send('line', '正在等待本地语音服务启动…\n');
+      let up = await tcpUp(SPEECH_PORT);
+      for (let i = 0; i < 120 && !up; i++) { await sleep(500); up = await tcpUp(SPEECH_PORT); }
+      if (up) {
+        const s = (await speechServiceStatus()).service || {};
+        send('ready', '本地语音服务已启动', { installed: true, vad: !!s.vad, smartturn: !!s.smartturn, stt: !!s.stt });
+        return;
+      }
+      // 端口始终未起来
+      if (!st.installed) {
+        send('line', '开始初始化本地语音服务（建 venv → 装依赖 → 下载模型 → 自检，约几分钟）…\n');
+        const ok = await runSetup();
+        if (!ok) { send('error', '环境初始化失败，请查看上方日志，或手动运行 setup_speech.bat'); return; }
+        await ensureSpeechService();
+        let up2 = await tcpUp(SPEECH_PORT);
+        for (let i = 0; i < 120 && !up2; i++) { await sleep(500); up2 = await tcpUp(SPEECH_PORT); }
+        if (up2) {
+          const s = (await speechServiceStatus()).service || {};
+          send('ready', '环境就绪，语音服务已启动', { installed: true, vad: !!s.vad, smartturn: !!s.smartturn, stt: !!s.stt });
+        } else {
+          send('done', '依赖已安装完成，服务仍在启动，可稍后刷新查看');
+        }
+      } else {
+        send('error', '本地语音服务无法启动（依赖已安装）。请查看 speech/speech.log，或手动运行 setup_speech.bat 修复。');
+      }
+    } catch (e) {
+      send('error', String((e && e.message) || e));
+    } finally {
+      envSetupBusy = false;
+      try { res.end(); } catch (e) { /* ignore */ }
+    }
+  })();
+});
+
+// ---------------------------------------------------------------------------
 // TTS
 // ---------------------------------------------------------------------------
 async function edgeTtsBuffer(text, voice, rate, pitch) {

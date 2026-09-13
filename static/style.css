@@ -147,6 +147,13 @@ textarea { resize: vertical; }
 }
 .speech-banner.show { display: block; }
 .speech-banner.ok { background: #eefaf4; border-color: #c2e8d6; color: var(--ok); }
+.env-log {
+  margin-top: 8px; padding: 10px 12px; border-radius: 8px;
+  background: #10151f; color: #c9d4e6; font-size: 12px; line-height: 1.6;
+  max-height: 220px; overflow: auto; white-space: pre-wrap; word-break: break-all;
+}
+.env-log::-webkit-scrollbar { width: 8px; }
+.env-log::-webkit-scrollbar-thumb { background: #33415c; border-radius: 4px; }
 
 .setup.locked fieldset { opacity: .85; background: #fafbfe; }
 .setup.locked input, .setup.locked select, .setup.locked textarea { background: #f2f4f9; color: #475069; pointer-events: none; }

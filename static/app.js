@@ -78,6 +78,7 @@ function init() {
   bindEvents();
   bindResume();
   bindRef();
+  bindEnvInit();
   setupTtsVisible();
   setupSttVisible();
   initLlmControls();
@@ -86,6 +87,54 @@ function init() {
   if (snap && snap.started && !snap.ended) {
     $('resumeBar').hidden = false;
   }
+}
+
+/** 「⚙️ 初始化本地环境」：检查就绪度，缺失依赖自动安装，日志流式回显 */
+function bindEnvInit() {
+  const btn = $('btnEnvInit');
+  btn.addEventListener('click', async () => {
+    if (btn.disabled) return;
+    btn.disabled = true;
+    const orig = btn.textContent;
+    btn.textContent = '初始化中…';
+    const logEl = $('envLog');
+    logEl.hidden = false;
+    logEl.textContent = '';
+    const append = (t) => { logEl.textContent += t; logEl.scrollTop = logEl.scrollHeight; };
+    try {
+      const res = await fetch('/api/speech/setup', { method: 'POST' });
+      if (!res.ok || !res.body) { append('❌ 请求失败（HTTP ' + res.status + '）\n'); return; }
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buf = '';
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        let idx;
+        while ((idx = buf.indexOf('\n\n')) >= 0) {
+          const chunk = buf.slice(0, idx);
+          buf = buf.slice(idx + 2);
+          const dataLine = chunk.split('\n').find((l) => l.startsWith('data: '));
+          if (!dataLine) continue;
+          try {
+            const ev = JSON.parse(dataLine.slice(6));
+            if (ev.type === 'line' || ev.type === 'err' || ev.type === 'info') append(ev.msg);
+            else if (ev.type === 'ready') append('\n✅ ' + ev.msg + '\n');
+            else if (ev.type === 'done') append('\n✅ ' + ev.msg + '\n');
+            else if (ev.type === 'error') append('\n❌ ' + ev.msg + '\n');
+          } catch (e) { /* ignore */ }
+        }
+      }
+      append('\n—— 完成 ——\n');
+    } catch (e) {
+      append('❌ ' + e.message + '\n');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = orig;
+      initSpeechStatus(); // 刷新顶部状态提示
+    }
+  });
 }
 
 // ---------- 面试参考资料：上传 → 逐份解析 → 合并预览 ----------
