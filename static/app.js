@@ -1179,14 +1179,17 @@ async function endInterview() {
     toast('总结请求失败: ' + e.message);
   }
 
-  await saveRecord();
-  clearSnapshot();
-  // 解锁配置区, 允许修改并发起新一轮面试
-  unlockSetup();
-  statusPill('', '待开始');
-  addSystemLine('✅ 本次面试已结束。可在左侧修改配置，点击「开始面试」开启新的一轮。');
-  if (state.summary) openSummary();
-  else addSystemLine('⚠️ 未能生成总结。可在「历史记录」中查看本次记录。');
+  try {
+    await saveRecord();
+    clearSnapshot();
+    if (state.summary) openSummary();
+    else addSystemLine('⚠️ 未能生成总结。可在「历史记录」中查看本次记录。');
+  } finally {
+    // 无论如何都要解锁配置区, 允许修改并发起新一轮面试
+    unlockSetup();
+    statusPill('', '待开始');
+    addSystemLine('✅ 本次面试已结束。可在左侧修改配置，点击「开始面试」开启新的一轮。');
+  }
 }
 
 function buildRecord() {
@@ -1217,8 +1220,8 @@ function buildRecord() {
 }
 
 async function saveRecord() {
-  const rec = buildRecord();
   try {
+    const rec = buildRecord();
     const res = await fetch('/api/records', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
