@@ -580,8 +580,11 @@ async function requestReply() {
     tipEl.remove();
     state.history.push({ role: 'assistant', content: reply, at: now() });
     const bubbleEl = addMessage(state.history[state.history.length - 1]);
-    if (state.mode !== 'realtime' || !rt.speaking) {
+    const isOpening = state.history.length === 1; // 开场白：第一条消息只展示不朗读
+    if (!isOpening && (state.mode !== 'realtime' || !rt.speaking)) {
       speak(reply, bubbleEl);
+    } else if (isOpening) {
+      // 开场白直接展示，不自动播报（可点击气泡「播放」手动收听）
     } else {
       toast('您正在说话，面试官语音回复已暂停（可点击气泡播放）');
     }
