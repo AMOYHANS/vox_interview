@@ -849,17 +849,31 @@ function getRecognition() {
 }
 
 function startBrowserRecording() {
-  if (!rec) rec = getRecognition();
-  if (!rec) {
+  if (!(window.SpeechRecognition || window.webkitSpeechRecognition)) {
     toast('当前浏览器不支持语音识别，请使用文字输入，或在配置中改用第三方接口');
     return;
   }
+  // 清掉可能还残留的底层会话（有的内核 stop() 不生效，导致 start() 报 already started）
+  if (rec) { try { rec.abort(); } catch (e) { /* ignore */ } }
+  rec = getRecognition();
   recFinal = '';
   recInterim = '';
   recActive = true;
   setMicRec(true);
   showLive('正在聆听…');
-  try { rec.start(); } catch (e) { recActive = false; setMicRec(false); hideLive(); toast('语音识别启动失败: ' + e.message); }
+  try {
+    rec.start();
+  } catch (e) {
+    // 极端情况下仍在运行：再清一次并新建重试
+    try { rec.abort(); } catch (e2) { /* ignore */ }
+    rec = getRecognition();
+    try { rec.start(); } catch (e2) {
+      recActive = false;
+      setMicRec(false);
+      hideLive();
+      toast('语音识别启动失败: ' + (e2.message || e.message));
+    }
+  }
 }
 
 function onRecResult(e) {
@@ -875,28 +889,28 @@ function onRecResult(e) {
   // 静音自动提交
   clearTimeout(recSilenceTimer);
   recSilenceTimer = setTimeout(() => {
-    if (recActive) { try { rec.stop(); } catch (e) { /* ignore */ } }
+    if (recActive) finalizeBrowserRecording();
   }, 4000);
 }
 
 function onRecEnd() {
   clearTimeout(recSilenceTimer);
-  if (!recActive) return;
-  recActive = false;
-  setMicRec(false);
-  hideLive();
-  const text = recFinal.trim();
-  if (text) {
-    showLive('识别完成，正在发送…');
-    setTimeout(() => { hideLive(); sendCandidate(text); }, 400);
-  } else {
-    toast('没有识别到内容，请再试一次');
-  }
+  if (!recActive) return; // 已由结束流程处理
+  finalizeBrowserRecording();
 }
 
 function onRecError(e) {
   if (e.error === 'no-speech') {
-    // 静音结束, 走 onEnd 流程
+    // 有的内核只报 no-speech 而不触发 onEnd：按"没识别到"结束本轮
+    finalizeBrowserRecording();
+    return;
+  }
+  if (e.error === 'aborted' || e.error === 'canceled' || e.error === 'cancelled') {
+    // 主动 abort 触发的正常回调，静默复位即可
+    recActive = false;
+    clearTimeout(recSilenceTimer);
+    setMicRec(false);
+    hideLive();
     return;
   }
   recActive = false;
@@ -906,15 +920,17 @@ function onRecError(e) {
   toast('语音识别错误: ' + (e.error || e.message || '未知'));
 }
 
-function stopBrowserRecording() {
+/**
+ * 统一的"结束本轮录音"：无论手动停止还是静音自动停止都走这里。
+ * 不再依赖 onend：立即复位 UI，稍候提交已识别文本，最后再 abort()
+ * 强制终止底层会话（保证下一次 start() 一定能再次启动）。
+ */
+function finalizeBrowserRecording() {
   if (!recActive) return;
-  // 立即置为已停止，避免 onend 再走一遍提交逻辑（有的内核 stop() 不触发 onend）
   recActive = false;
   clearTimeout(recSilenceTimer);
   setMicRec(false);
   hideLive();
-  try { rec.stop(); } catch (e) { /* ignore */ }
-  // 稍等收尾帧（final 结果），然后手动提交本轮识别文本
   setTimeout(() => {
     const text = (recFinal || '').trim();
     if (text) {
@@ -924,7 +940,12 @@ function stopBrowserRecording() {
       hideLive();
       toast('没有识别到内容，请再试一次');
     }
+    try { if (rec) rec.abort(); } catch (e) { /* ignore */ }
   }, 450);
+}
+
+function stopBrowserRecording() {
+  finalizeBrowserRecording();
 }
 
 function setMicRec(on) {
