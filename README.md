@@ -5,25 +5,26 @@
 **SenseVoice 本地转写** → 面试官（大模型）回复 → TTS 播报，**你开口即打断**。
 面试记录自动保存，结束一键生成总结与建议。
 
-## 快速开始（网页版）
+## 启动（网页版 / 桌面版二选一）
 
-需要 [Node.js 18+](https://nodejs.org/)。Windows 双击 **start.bat**，或手动：
+需要 [Node.js 18+](https://nodejs.org/)。两种形态共存，用不同命令分别启动：
+
+| 形态 | 命令 / 双击 | 效果 |
+|---|---|---|
+| 🌐 网页版 | `npm run web`（或 `npm start` / 双击 `start.bat`） | 浏览器打开 http://127.0.0.1:8000 |
+| 🖥️ 桌面版 | `npm run desktop`（或 `npm run app` / 双击 `start_desktop.bat`） | 独立窗口，自动端口，无浏览器标签页 |
 
 ```bash
 npm install        # 前端依赖（只需一次）
-npm start          # 启动后浏览器打开 http://127.0.0.1:8000
-```
-
-## 桌面版（Electron）
-
-```bash
-npm run app        # 以桌面应用运行（内嵌服务 + 窗口，自动端口，无浏览器标签页）
+# 想用哪个启动哪个：
+npm run web        # 网页版
+npm run desktop    # 桌面版
 npm run dist       # 打包 Windows 便携版 exe（输出到 dist/）
 ```
 
-- Electron 会内嵌启动 Express + 语音服务，退出时自动清理语音子进程；单实例运行。
-- 实时语音模式在桌面端照常工作（AudioWorklet + 本地 VAD/SmartTurn/SenseVoice）。
-- 注意：桌面端同样依赖已安装的本地语音服务（先跑 setup_speech.bat）。
+- 桌面版（Electron）内嵌 Express + 语音服务，退出时自动清理语音子进程、单实例运行。
+- 两种形态可同时跑（桌面版自动端口，不与网页版 8000 冲突），共用一个语音服务。
+- 实时语音模式在两种形态下都可用；都需先安装本地语音服务（`setup_speech.bat`）。
 
 **两种对话方式（页面配置面板可选）：**
 
