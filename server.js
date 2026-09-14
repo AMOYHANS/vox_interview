@@ -25,7 +25,10 @@ const mammoth = require('mammoth');
 const app = express();
 const PORT = process.env.PORT || 8000;
 const STATIC_DIR = path.join(__dirname, 'static');
-const RECORDS_DIR = path.join(__dirname, 'records');
+// 数据目录：打包版用 Electron 的 userData（持久，便携版临时目录会每次清空）；
+// 源码/开发态用项目目录（保持原行为）。
+const DATA_DIR = process.env.VOX_DATA_DIR ? path.resolve(process.env.VOX_DATA_DIR) : __dirname;
+const RECORDS_DIR = path.join(DATA_DIR, 'records');
 const SPEECH_PORT = Number(process.env.SPEECH_PORT || 8765);
 fs.mkdirSync(RECORDS_DIR, { recursive: true });
 
@@ -113,7 +116,7 @@ let speechDetail = '';
 
 function loadSpeechRuntime() {
   try {
-    speechRuntime = JSON.parse(fs.readFileSync(path.join(__dirname, 'speech', 'runtime.json'), 'utf8'));
+    speechRuntime = JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'speech', 'runtime.json'), 'utf8'));
   } catch (e) {
     speechRuntime = null;
   }

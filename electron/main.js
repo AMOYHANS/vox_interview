@@ -7,6 +7,13 @@
  * 网页模式（node server.js）不受影响。
  */
 const { app, BrowserWindow, Menu, dialog } = require('electron');
+
+// 打包后把可写数据（记录、语音环境 .venv / runtime.json / 可编辑 config）放到 userData，
+// 因为便携版 exe 每次解压到临时目录、启动后即清空，装在应用目录会丢失。
+if (app.isPackaged) {
+  process.env.VOX_DATA_DIR = app.getPath('userData');
+}
+
 const { startServer, stopServer, stopSpeechService } = require('../server');
 
 let mainWin = null;

@@ -24,10 +24,16 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 SPEECH_DIR = BASE_DIR / "speech"
-VENV_DIR = SPEECH_DIR / ".venv"
 REQ = SPEECH_DIR / "requirements.txt"
-RUNTIME = SPEECH_DIR / "runtime.json"
-CONFIG = SPEECH_DIR / "config.json"
+
+# 可写数据目录：打包版指向 Electron userData（便携版临时目录每次启动会清空），开发态即项目目录
+DATA_DIR = Path(os.environ.get("VOX_DATA_DIR") or BASE_DIR)
+WORK_SPEECH = DATA_DIR / "speech"
+VENV_DIR = WORK_SPEECH / ".venv"
+RUNTIME = WORK_SPEECH / "runtime.json"
+# config：优先读可编辑副本（打包版用户可改代理等），没有则回退打包内置的
+CFG_USER = WORK_SPEECH / "config.json"
+CONFIG = CFG_USER if CFG_USER.is_file() else SPEECH_DIR / "config.json"
 
 WINDOWS = os.name == "nt"
 
@@ -122,6 +128,15 @@ def main() -> None:
         except Exception:
             log("未检测到本地语音服务（缺少 speech/runtime.json）")
         sys.exit(1)
+
+    # 初始化数据目录：首次使用（尤其打包版）从内置复制一份可编辑的 config.json（可改代理等）
+    WORK_SPEECH.mkdir(parents=True, exist_ok=True)
+    try:
+        bundled_cfg = SPEECH_DIR / "config.json"
+        if not CFG_USER.exists() and bundled_cfg.exists():
+            shutil.copy2(bundled_cfg, CFG_USER)
+    except Exception as e:  # noqa: BLE001
+        log(f"提示：未能写入可编辑 config（{e}）")
 
     py = find_python()
     proxy = resolve_proxy()

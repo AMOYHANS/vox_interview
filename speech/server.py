@@ -98,6 +98,15 @@ def load_config() -> dict:
             _merge(cfg, user)
         except Exception as e:  # noqa: BLE001
             log.warning("config.json 解析失败: %s", e)
+    # 打包版：用户可编辑的数据目录 config（userData/speech/config.json）优先级更高
+    _d = os.environ.get("VOX_DATA_DIR")
+    if _d:
+        up = Path(_d) / "speech" / "config.json"
+        if up.is_file():
+            try:
+                _merge(cfg, json.loads(up.read_text("utf-8")))
+            except Exception as e:  # noqa: BLE001
+                log.warning("数据目录 config 解析失败: %s", e)
     # 环境变量覆盖
     if os.environ.get("SMART_TURN_MODEL_PATH"):
         cfg["smart_turn"]["model_path"] = os.environ["SMART_TURN_MODEL_PATH"]

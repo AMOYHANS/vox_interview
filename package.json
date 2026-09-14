@@ -39,6 +39,7 @@
       "electron/**",
       "server.js",
       "static/**",
+      "scripts/**",
       "speech/server.py",
       "speech/config.json",
       "speech/requirements.txt",
